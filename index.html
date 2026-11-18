@@ -1,0 +1,943 @@
+
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Tab</title>
+<link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@400;500;600;700&family=Changa+One&display=swap" rel="stylesheet">
+
+<style>
+:root {
+    --glass-rgb:255,255,255;
+    --glass-opacity:.10;
+    --glass-border:.22;
+    --glass-blur:22px;
+    --accent:#d99aff;
+}
+* { box-sizing:border-box; }
+html,body { width:100%;height:100%;min-height:0;margin:0;overflow:hidden; }
+body {
+    padding:145px 25px 20px;
+    color:white;
+    font-family:"Shantell Sans",cursive;
+    background:linear-gradient(rgba(0,0,0,.35),rgba(0,0,0,.55)),url("wallpaper.png") center/cover fixed no-repeat,#111;
+}
+button,input,textarea { font:inherit; }
+button { color:white;cursor:pointer; }
+
+.clock {
+    position:fixed;top:5px;left:0;width:100%;z-index:5;text-align:center;
+    font:clamp(65px,11vw,135px)/1 "Changa One",cursive;
+    font-variant-numeric:tabular-nums;color:transparent;
+    -webkit-text-fill-color:transparent;-webkit-text-stroke:1px rgba(255,255,255,.55);
+    filter:drop-shadow(0 8px 22px rgba(120,200,255,.4));pointer-events:none;
+}
+.topbar { position:fixed;top:12px;right:16px;z-index:100;display:flex;gap:8px; }
+.top-btn,.action-btn {
+    padding:9px 13px;border:1px solid rgba(255,255,255,.2);border-radius:12px;
+    background:rgba(20,20,25,.45);backdrop-filter:blur(16px);
+    -webkit-backdrop-filter:blur(16px);transition:.2s;
+}
+.top-btn:hover,.action-btn:hover { background:rgba(255,255,255,.2);transform:translateY(-2px); }
+.top-btn.active { background:rgba(217,154,255,.3);border-color:var(--accent); }
+
+.dashboard { position:relative;width:min(1100px,100%);height:calc(100vh - 165px);min-height:250px;margin:0 auto;overflow:visible; }
+
+.widget {
+    position:absolute;left:0;top:0;width:250px;height:190px;min-width:150px;min-height:110px;
+    padding:13px;border:1px solid rgba(var(--glass-rgb),var(--glass-border));
+    border-radius:21px;background:rgba(var(--glass-rgb),var(--glass-opacity));
+    backdrop-filter:blur(var(--glass-blur));-webkit-backdrop-filter:blur(var(--glass-blur));
+    box-shadow:0 8px 32px rgba(0,0,0,.25);overflow:hidden;display:flex;flex-direction:column;
+    transition:background .2s,border-color .2s;
+}
+.widget:hover { background:rgba(var(--glass-rgb),calc(var(--glass-opacity) + .035)); }
+.widget h2 { font-size:15px;margin:0; }
+.widget-header { display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:9px;flex-shrink:0; }
+.widget-tools { display:none;gap:5px; }
+.widget-tools button {
+    width:27px;height:27px;border:1px solid rgba(255,255,255,.2);
+    border-radius:8px;background:rgba(0,0,0,.3);
+}
+.widget-tools button:hover { background:rgba(255,70,100,.5); }
+.widget-content { min-height:0;flex:1;overflow:auto; }
+.widget-content::-webkit-scrollbar { width:4px; }
+.widget-content::-webkit-scrollbar-thumb { background:rgba(255,255,255,.25);border-radius:10px; }
+
+.search-card { width:590px;height:235px; }
+.weather-card { width:210px;height:235px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center; }
+.spotify-card { width:590px;height:390px; }
+body.editing .widget { outline:2px dashed rgba(255,255,255,.65);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none; }
+body.editing .widget:active { cursor:grabbing; }
+body.editing .widget-tools { display:flex; }
+body.editing .widget-content { pointer-events:none; }
+.widget.dragging { z-index:1000!important;opacity:.92;transition:none;box-shadow:0 15px 45px rgba(0,0,0,.5); }
+.scale-handle {
+    display:none;position:absolute;bottom:5px;right:5px;width:22px;height:22px;
+    border-right:3px solid white;border-bottom:3px solid white;cursor:nwse-resize;z-index:10;touch-action:none;
+}
+body.editing .scale-handle { display:block; }
+
+.search-card h1 { text-align:center;font-size:clamp(17px,2vw,25px);margin:0 0 10px; }
+.search-stack { display:grid;gap:8px; }
+.text-input,.note-input {
+    width:100%;min-width:0;padding:10px 13px;border:1px solid rgba(255,255,255,.15);
+    border-radius:12px;outline:none;background:rgba(0,0,0,.2);color:white;
+}
+.text-input::placeholder,.note-input::placeholder { color:rgba(255,255,255,.55); }
+.text-input:focus,.note-input:focus { border-color:rgba(255,255,255,.6); }
+.shortcuts { display:flex;justify-content:center;flex-wrap:wrap;gap:8px;margin-top:10px; }
+.shortcuts a {
+    width:58px;padding:6px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;
+    border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.07);
+    color:white;text-decoration:none;font-size:10px;transition:.2s;
+}
+.shortcuts a:hover { transform:translateY(-4px);background:rgba(255,255,255,.18); }
+.shortcuts img { width:23px;height:23px; }
+
+.weather-icon { font-size:38px; }
+.weather-temp { font-size:31px;font-weight:700; }
+
+.spotify-box { display:flex;flex-direction:column;gap:8px;height:100%; }
+.spotify-controls { display:flex;gap:8px;flex-shrink:0; }
+.spotify-controls input { flex:1; }
+.spotify-frame { width:100%;min-height:300px;flex:1;border:0;border-radius:13px;background:transparent; }
+
+.calc-display {
+    width:100%;height:38px;margin-bottom:8px;padding:7px;border:1px solid rgba(255,255,255,.15);
+    border-radius:10px;background:rgba(0,0,0,.25);color:white;text-align:right;font-size:20px;
+}
+.calc-buttons { display:grid;grid-template-columns:repeat(4,1fr);gap:5px; }
+.calc-buttons button { min-height:29px;border:1px solid rgba(255,255,255,.1);border-radius:9px;background:rgba(255,255,255,.1); }
+.calc-buttons button:hover { background:rgba(255,255,255,.25); }
+.calc-buttons .operator { background:rgba(217,154,255,.2); }
+.calc-buttons .equals { background:rgba(150,120,255,.4); }
+.calc-buttons .clear { background:rgba(255,70,100,.3); }
+
+.todo-add { display:flex;gap:8px; }
+.todo-add input { flex:1; }
+.todo-list { padding:0;margin:8px 0 0;list-style:none;display:grid;gap:6px; }
+.todo-list li { display:flex;align-items:center;gap:8px;padding:7px;background:rgba(0,0,0,.15);border-radius:10px; }
+.todo-list li span { flex:1;overflow-wrap:anywhere; }
+.todo-list li.done span { text-decoration:line-through;opacity:.5; }
+.todo-list li button { background:none;border:0; }
+.note-input { height:100%;min-height:70px;resize:none; }
+.timer { font-size:34px;text-align:center;margin:7px 0;font-weight:700;font-variant-numeric:tabular-nums; }
+.timer-actions { display:flex;justify-content:center;gap:8px;flex-wrap:wrap; }
+
+.widget-menu,.settings-panel {
+    display:none;position:fixed;top:65px;right:16px;z-index:200;
+    width:min(315px,calc(100vw - 32px));padding:18px;border:1px solid rgba(255,255,255,.2);
+    border-radius:18px;background:rgba(20,20,28,.93);backdrop-filter:blur(25px);
+    box-shadow:0 15px 45px rgba(0,0,0,.4);
+}
+.widget-menu.open,.settings-panel.open { display:block; }
+.widget-menu h3,.settings-panel h3 { margin:0 0 15px;font-size:16px; }
+.widget-options { display:grid;grid-template-columns:1fr 1fr;gap:8px; }
+.widget-option {
+    padding:12px 8px;border:1px solid rgba(255,255,255,.15);border-radius:12px;
+    background:rgba(255,255,255,.08);text-align:left;color:white;
+}
+.widget-option:hover { background:rgba(217,154,255,.25);border-color:var(--accent); }
+.widget-option:disabled { opacity:.35;cursor:not-allowed; }
+
+.setting-row { display:flex;justify-content:space-between;align-items:center;gap:12px;margin:13px 0;font-size:13px; }
+.setting-row input[type=color] { width:45px;height:32px;border:0;background:transparent; }
+.setting-row input[type=range] { width:125px;accent-color:var(--accent); }
+.tint-presets { display:grid;grid-template-columns:repeat(6,1fr);gap:9px;margin:14px 0; }
+.tint { aspect-ratio:1;border:2px solid rgba(255,255,255,.6);border-radius:50%; }
+.tint:hover { transform:scale(1.12); }
+.panel-actions { display:flex;gap:8px; }
+.panel-actions button { flex:1; }
+
+@media(max-width:700px) {
+    body { padding:120px 12px 12px; }
+    .clock { top:5px;font-size:65px; }
+    .topbar { top:67px;right:8px;gap:5px; }
+    .top-btn { padding:7px 9px;font-size:11px; }
+    .dashboard { height:calc(100vh - 135px); }
+    .search-card { width:min(590px,calc(100vw - 24px));height:235px; }
+    .weather-card { width:180px;height:190px; }
+    .spotify-card { width:min(590px,calc(100vw - 24px));height:390px; }
+}
+</style>
+</head>
+<body>
+
+<div class="clock" id="clock">--:--:--</div>
+
+<div class="topbar">
+    <button class="top-btn" id="editBtn">Mută widgeturi</button>
+    <button class="top-btn" id="addBtn">+ Adaugă</button>
+    <button class="top-btn" id="settingsBtn">Gemulet :]</button>
+</div>
+
+<section class="widget-menu" id="widgetMenu">
+    <h3>Ce mai punem pe aici? :D</h3>
+    <div class="widget-options">
+        <button class="widget-option" data-add="calculator">🧮 Calculator</button>
+        <button class="widget-option" data-add="todo">✅ To-do list</button>
+        <button class="widget-option" data-add="notes">📝 Notes</button>
+        <button class="widget-option" data-add="focus">⏱️ Focus timer</button>
+    </div>
+</section>
+
+<section class="settings-panel" id="settingsPanel">
+    <h3>Cum vrei sa arate liquid glass</h3>
+    <div class="setting-row">
+        <label for="tintPicker">Culoare</label>
+        <input type="color" id="tintPicker" value="#ffffff">
+    </div>
+    <div class="tint-presets">
+        <button class="tint" data-color="#ffffff" style="background:#ffffff"></button>
+        <button class="tint" data-color="#b98cff" style="background:#b98cff"></button>
+        <button class="tint" data-color="#70c8ff" style="background:#70c8ff"></button>
+        <button class="tint" data-color="#ff91c8" style="background:#ff91c8"></button>
+        <button class="tint" data-color="#77e6bd" style="background:#77e6bd"></button>
+        <button class="tint" data-color="#ffbd70" style="background:#ffbd70"></button>
+    </div>
+    <div class="setting-row">
+        <label for="opacityRange">Opacitate</label>
+        <input id="opacityRange" type="range" min="3" max="28" value="10">
+    </div>
+    <div class="setting-row">
+        <label for="blurRange">Blur</label>
+        <input id="blurRange" type="range" min="0" max="40" value="22">
+    </div>
+    <div class="panel-actions">
+        <button class="action-btn" id="resetGlass">Reset</button>
+        <button class="action-btn" id="closeSettings">Ok</button>
+    </div>
+</section>
+
+<main class="dashboard" id="dashboard">
+    <section class="widget search-card" data-widget="search" style="left:0;top:0;">
+        <div class="widget-header">
+            <h2>Tab Misto</h2>
+            <div class="widget-tools"><button class="remove-widget" title="Remove">×</button></div>
+        </div>
+        <div class="widget-content">
+            <h1>Ce vrei sa cauti cumetre?</h1>
+            <div class="search-stack">
+                <input class="text-input" id="search" placeholder="Cauta cumetre...">
+                <input class="text-input" id="urlbar" placeholder="Scrie adresa cumetre...">
+            </div>
+            <div class="shortcuts">
+                <a href="https://youtube.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=youtube.com&sz=64">YouTube</a>
+                <a href="https://github.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=github.com&sz=64">GitHub</a>
+                <a href="https://reddit.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=reddit.com&sz=64">Reddit</a>
+                <a href="https://chatgpt.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64">ChatGPT</a>
+                <a href="https://gemini.google.com" target="_blank"><img src="https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64">Gemini</a>
+            </div>
+        </div>
+        <span class="scale-handle"></span>
+    </section>
+
+    <section class="widget weather-card" data-widget="weather" style="left:610px;top:0;">
+        <div class="widget-header">
+            <h2>Constanța</h2>
+            <div class="widget-tools"><button class="remove-widget">×</button></div>
+        </div>
+        <div class="widget-content">
+            <div class="weather-icon" id="weather-icon">🌤️</div>
+            <div id="weather">Se cauta vremea vere...</div>
+            <div class="weather-temp" id="temperature">--°C</div>
+        </div>
+        <span class="scale-handle"></span>
+    </section>
+
+    <section class="widget spotify-card" data-widget="spotify" style="left:0;top:255px;">
+        <div class="widget-header">
+            <h2>♫ Spotify</h2>
+            <div class="widget-tools"><button class="remove-widget">×</button></div>
+        </div>
+        <div class="widget-content spotify-box">
+            <div class="spotify-controls">
+                <input class="text-input" id="spotifyUrl" placeholder="Da copypaste la ce prostie vrei sa asculti de la Spotify...">
+                <button class="action-btn" id="loadSpotify">Pune</button>
+            </div>
+            <iframe
+                class="spotify-frame"
+                id="spotifyFrame"
+                title="Spotify player"
+                src="https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M?theme=0"
+                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
+                allowfullscreen
+                loading="eager">
+            </iframe>
+        </div>
+        <span class="scale-handle"></span>
+    </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const dashboard = $("dashboard");
+
+const STORAGE = {
+    widgets:"newtab_widgets",
+    spotify:"newtab_spotify_url",
+    glass:"newtab_glass",
+    notes:"newtab_notes_widget",
+    todos:"newtab_todo_todo",
+    timer:"newtab_focus_timer"
+};
+
+/* CLOCK */
+
+function updateClock() {
+    $("clock").textContent = new Intl.DateTimeFormat("en-GB", {
+        timeZone:"Europe/Bucharest",
+        hour:"2-digit",minute:"2-digit",second:"2-digit"
+    }).format(new Date());
+}
+updateClock();
+setInterval(updateClock,1000);
+
+/* SEARCH */
+
+$("search").addEventListener("keydown",e => {
+    if(e.key === "Enter" && e.target.value.trim()) {
+        location.href = "https://duckduckgo.com/?q=" + encodeURIComponent(e.target.value.trim());
+    }
+});
+
+$("urlbar").addEventListener("keydown",e => {
+    if(e.key === "Enter" && e.target.value.trim()) {
+        let url = e.target.value.trim();
+        if(!/^https?:\/\//i.test(url)) url = "https://" + url;
+        try {
+            const parsed = new URL(url);
+            if(!["http:","https:"].includes(parsed.protocol)) throw new Error();
+            location.href = parsed.href;
+        } catch {
+            alert("Scrie un link valid cumetre.");
+        }
+    }
+});
+
+/* WEATHER */
+
+const conditions = {
+    0:["☀️","YEE INSORIT"],1:["🌤️","Meh, cam insorit"],2:["⛅","Ah, cam noros"],
+    3:["☁️","BAA, e noros :("],45:["🌫️","E ceata"],48:["🌫️","Tot e ceata"],
+    51:["🌦️","Mrr burnita"],53:["🌦️","Ah burnita"],55:["🌧️","Mama ce burnita"],
+    61:["🌧️","Ploua un pic"],63:["🌧️","Vezi ca ploua"],65:["🌧️","BAAA TOARNA"],
+    71:["🌨️","Ninge cam putin"],73:["🌨️","NINGEEE"],75:["❄️","MA INGROP IN ZAPADA"],
+    80:["🌦️","DAMN CE PLOUA"],81:["🌧️","Tot ploua mama"],82:["⛈️","VEREEE ce ploua"],
+    95:["⛈️","DAMN. furtuna"],96:["⛈️","SOCAANT."],99:["⛈️","BUM. furtuna"]
+};
+
+async function loadWeather() {
+    try {
+        const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=Constanta&count=10&language=en&format=json");
+        if(!geo.ok) throw new Error();
+        const data = await geo.json();
+        const city = data.results?.find(x => x.country_code === "RO");
+        if(!city) throw new Error();
+
+        const response = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${city.latitude}&longitude=${city.longitude}&current=temperature_2m,weather_code`);
+        if(!response.ok) throw new Error();
+
+        const current = (await response.json()).current;
+        const [icon,description] = conditions[current.weather_code] || ["🌡️","Weather"];
+        $("weather-icon").textContent = icon;
+        $("weather").textContent = description;
+        $("temperature").textContent = Math.round(current.temperature_2m) + "°C";
+    } catch {
+        $("weather").textContent = "Weather unavailable";
+        $("temperature").textContent = "";
+    }
+}
+loadWeather();
+
+/* SPOTIFY */
+
+function getSpotifyEmbed(input) {
+    try {
+        const url = new URL(input.trim());
+        if(!["open.spotify.com","www.open.spotify.com"].includes(url.hostname)) return null;
+
+        const parts = url.pathname.split("/").filter(Boolean);
+        const types = ["playlist","album","track","episode","show"];
+        const typeIndex = parts.findIndex(part => types.includes(part));
+
+        if(typeIndex < 0 || !parts[typeIndex + 1]) return null;
+
+        const type = parts[typeIndex];
+        const id = parts[typeIndex + 1].split("?")[0];
+
+        if(!/^[a-zA-Z0-9]+$/.test(id)) return null;
+
+        return `https://open.spotify.com/embed/${type}/${id}?theme=0`;
+    } catch {
+        return null;
+    }
+}
+
+function loadSpotify() {
+    const input = $("spotifyUrl").value.trim();
+    const embed = getSpotifyEmbed(input);
+
+    if(!embed) {
+        alert("Pune un link Spotify valid.");
+        return;
+    }
+
+    $("spotifyFrame").src = embed;
+    localStorage.setItem(STORAGE.spotify,input);
+}
+
+$("loadSpotify").addEventListener("click",loadSpotify);
+$("spotifyUrl").addEventListener("keydown",e => {
+    if(e.key === "Enter") loadSpotify();
+});
+
+const savedSpotify = localStorage.getItem(STORAGE.spotify);
+if(savedSpotify) {
+    $("spotifyUrl").value = savedSpotify;
+    const embed = getSpotifyEmbed(savedSpotify);
+    if(embed) $("spotifyFrame").src = embed;
+}
+
+/* WIDGET TEMPLATES */
+
+const templates = {
+    calculator:`
+        <div class="widget-header"><h2>Calculezi ceva desteptule?</h2><div class="widget-tools"><button class="remove-widget">×</button></div></div>
+        <div class="widget-content">
+            <input class="calc-display" value="0" readonly>
+            <div class="calc-buttons">
+                <button class="clear" data-calc="clear">AC</button><button data-calc="delete">⌫</button>
+                <button class="operator" data-calc="%">%</button><button class="operator" data-calc="/">÷</button>
+                <button data-calc="7">7</button><button data-calc="8">8</button><button data-calc="9">9</button><button class="operator" data-calc="*">×</button>
+                <button data-calc="4">4</button><button data-calc="5">5</button><button data-calc="6">6</button><button class="operator" data-calc="-">−</button>
+                <button data-calc="1">1</button><button data-calc="2">2</button><button data-calc="3">3</button><button class="operator" data-calc="+">+</button>
+                <button data-calc="(">(</button><button data-calc="0">0</button><button data-calc=".">.</button><button class="equals" data-calc="equals">=</button>
+            </div>
+        </div>`,
+    todo:`
+        <div class="widget-header"><h2>Ce n-ai facut cumetre?</h2><div class="widget-tools"><button class="remove-widget">×</button></div></div>
+        <div class="widget-content">
+            <div class="todo-add"><input class="text-input todo-input" placeholder="Adaugă o treaba..."><button class="action-btn todo-add-btn">+</button></div>
+            <ul class="todo-list"></ul>
+        </div>`,
+    notes:`
+        <div class="widget-header"><h2>Notezi ceva cumetre?</h2><div class="widget-tools"><button class="remove-widget">×</button></div></div>
+        <div class="widget-content"><textarea class="note-input" placeholder="Scrie ceva aici cumetre."></textarea></div>`,
+    focus:`
+        <div class="widget-header"><h2>Vrei sa te concentrezi?</h2><div class="widget-tools"><button class="remove-widget">×</button></div></div>
+        <div class="widget-content">
+            <div class="timer">25:00</div>
+            <div class="timer-actions"><button class="action-btn timer-start">Da-i blana</button><button class="action-btn timer-reset">De la inceput</button></div>
+        </div>`
+};
+
+const widgetNames = {calculator:"Calculator",todo:"To-do list",notes:"Notes",focus:"Focus timer"};
+let editMode = false;
+let highestZ = 10;
+
+/* STORAGE HELPERS */
+
+function saveWidgets() {
+    const widgets = [...dashboard.querySelectorAll(".widget")].map(widget => ({
+        id:widget.dataset.widget,
+        x:Number(widget.dataset.x || 0),
+        y:Number(widget.dataset.y || 0),
+        width:widget.style.width || getComputedStyle(widget).width,
+        height:widget.style.height || getComputedStyle(widget).height,
+        z:widget.style.zIndex || "1"
+    }));
+    localStorage.setItem(STORAGE.widgets,JSON.stringify(widgets));
+}
+
+function applyWidgetSettings(widget,item) {
+    const x = Number(item.x || 0);
+    const y = Number(item.y || 0);
+    widget.dataset.x = x;
+    widget.dataset.y = y;
+    widget.style.translate = `${x}px ${y}px`;
+    if(item.width) widget.style.width = item.width;
+    if(item.height) widget.style.height = item.height;
+    widget.style.zIndex = item.z || "1";
+    highestZ = Math.max(highestZ,Number(item.z || 1));
+}
+
+function createWidget(type,settings = {},shouldSave = true) {
+    if(!templates[type]) return null;
+
+    if(dashboard.querySelector(`[data-widget="${type}"]`)) {
+        if(shouldSave) alert("Widgetul asta exista deja, cumetre :D");
+        return null;
+    }
+
+    const widget = document.createElement("section");
+    widget.className = "widget";
+    widget.dataset.widget = type;
+    widget.innerHTML = templates[type] + `<span class="scale-handle"></span>`;
+
+    const count = dashboard.querySelectorAll(".widget").length;
+    const width = settings.width || (type === "calculator" ? "250px" : "270px");
+    const height = settings.height || (
+        type === "calculator" ? "260px" :
+        type === "todo" ? "230px" :
+        type === "notes" ? "200px" : "180px"
+    );
+
+    const x = settings.x ?? Math.max(0,Math.min(dashboard.clientWidth - parseInt(width),count * 35));
+    const y = settings.y ?? 30 + count * 25;
+
+    widget.style.width = width;
+    widget.style.height = height;
+    widget.style.left = "0px";
+    widget.style.top = "0px";
+    widget.style.zIndex = settings.z || ++highestZ;
+
+    dashboard.append(widget);
+    applyWidgetSettings(widget,{...settings,x,y});
+    setupWidget(widget);
+
+    if(editMode) document.body.classList.add("editing");
+    updateWidgetMenu();
+    if(shouldSave) saveWidgets();
+
+    return widget;
+}
+
+/* RESTORE WIDGETS - FIXED */
+
+function loadWidgets() {
+    const raw = localStorage.getItem(STORAGE.widgets);
+    const saved = raw ? JSON.parse(raw) : null;
+
+    if(!Array.isArray(saved)) {
+        const defaults = [
+            {id:"search",x:0,y:0,width:"590px",height:"235px",z:"1"},
+            {id:"weather",x:610,y:0,width:"210px",height:"235px",z:"2"},
+            {id:"spotify",x:0,y:255,width:"590px",height:"390px",z:"3"}
+        ];
+
+        defaults.forEach(item => {
+            const widget = dashboard.querySelector(`[data-widget="${item.id}"]`);
+            if(widget) applyWidgetSettings(widget,item);
+        });
+
+        saveWidgets();
+        return;
+    }
+
+    /* Keep references to the original widgets before clearing the dashboard. */
+    const originalWidgets = new Map(
+        [...dashboard.querySelectorAll(".widget")].map(widget => [widget.dataset.widget,widget])
+    );
+
+    dashboard.replaceChildren();
+
+    saved.forEach(item => {
+        if(!item || typeof item.id !== "string") return;
+
+        let widget;
+
+        if(originalWidgets.has(item.id)) {
+            widget = originalWidgets.get(item.id);
+            dashboard.append(widget);
+        } else if(templates[item.id]) {
+            widget = createWidget(item.id,item,false);
+        }
+
+        if(!widget) return;
+
+        applyWidgetSettings(widget,item);
+        setupWidget(widget);
+    });
+
+    updateWidgetMenu();
+    saveWidgets();
+}
+
+/* DRAGGING AND SCALING */
+
+function setupWidget(widget) {
+    if(widget.dataset.ready === "true") return;
+    widget.dataset.ready = "true";
+
+    const handle = widget.querySelector(".scale-handle");
+
+    widget.addEventListener("pointerdown",e => {
+        if(!editMode) return;
+        if(e.target.closest("button,input,textarea,select,a,iframe,.scale-handle")) return;
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const initialX = Number(widget.dataset.x || 0);
+        const initialY = Number(widget.dataset.y || 0);
+
+        widget.classList.add("dragging");
+        widget.style.zIndex = ++highestZ;
+        widget.setPointerCapture(e.pointerId);
+
+        const move = ev => {
+            const x = initialX + ev.clientX - startX;
+            const y = initialY + ev.clientY - startY;
+            widget.dataset.x = x;
+            widget.dataset.y = y;
+            widget.style.translate = `${x}px ${y}px`;
+        };
+
+        const stop = () => {
+            widget.classList.remove("dragging");
+            widget.removeEventListener("pointermove",move);
+            widget.removeEventListener("pointerup",stop);
+            widget.removeEventListener("pointercancel",stop);
+            saveWidgets();
+        };
+
+        widget.addEventListener("pointermove",move);
+        widget.addEventListener("pointerup",stop);
+        widget.addEventListener("pointercancel",stop);
+        e.preventDefault();
+    });
+
+    if(handle) {
+        handle.addEventListener("pointerdown",e => {
+            if(!editMode) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startWidth = widget.offsetWidth;
+            const startHeight = widget.offsetHeight;
+
+            handle.setPointerCapture(e.pointerId);
+
+            const move = ev => {
+                widget.style.width = Math.max(150,startWidth + ev.clientX - startX) + "px";
+                widget.style.height = Math.max(110,startHeight + ev.clientY - startY) + "px";
+            };
+
+            const stop = () => {
+                handle.removeEventListener("pointermove",move);
+                handle.removeEventListener("pointerup",stop);
+                handle.removeEventListener("pointercancel",stop);
+                saveWidgets();
+            };
+
+            handle.addEventListener("pointermove",move);
+            handle.addEventListener("pointerup",stop);
+            handle.addEventListener("pointercancel",stop);
+        });
+    }
+
+    setupWidgetFeatures(widget);
+}
+
+/* WIDGET FEATURES */
+
+function setupWidgetFeatures(widget) {
+    const type = widget.dataset.widget;
+
+    if(type === "calculator") {
+        const display = widget.querySelector(".calc-display");
+
+        widget.querySelectorAll("[data-calc]").forEach(button => {
+            button.addEventListener("click",() => {
+                const value = button.dataset.calc;
+
+                if(value === "clear") display.value = "0";
+                else if(value === "delete") display.value = display.value.slice(0,-1) || "0";
+                else if(value === "equals") {
+                    try {
+                        if(!/^[0-9+\-*/%.() ]+$/.test(display.value)) throw new Error();
+                        const result = Function('"use strict";return (' + display.value + ')')();
+                        if(!Number.isFinite(result)) throw new Error();
+                        display.value = String(Number(result.toPrecision(12)));
+                    } catch { display.value = "Error"; }
+                } else {
+                    if(display.value === "Error") display.value = "0";
+                    if(display.value === "0" && /[0-9.]/.test(value)) display.value = value;
+                    else display.value += value;
+                }
+            });
+        });
+    }
+
+    if(type === "todo") {
+        const input = widget.querySelector(".todo-input");
+        const list = widget.querySelector(".todo-list");
+        let todos = JSON.parse(localStorage.getItem(STORAGE.todos) || "[]");
+
+        const render = () => {
+            list.replaceChildren();
+
+            todos.forEach((todo,index) => {
+                const li = document.createElement("li");
+                if(todo.done) li.classList.add("done");
+
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.checked = todo.done;
+                checkbox.addEventListener("change",() => {
+                    todos[index].done = checkbox.checked;
+                    save();
+                });
+
+                const span = document.createElement("span");
+                span.textContent = todo.text;
+
+                const remove = document.createElement("button");
+                remove.textContent = "×";
+                remove.addEventListener("click",() => {
+                    todos.splice(index,1);
+                    save();
+                });
+
+                li.append(checkbox,span,remove);
+                list.append(li);
+            });
+        };
+
+        const save = () => {
+            localStorage.setItem(STORAGE.todos,JSON.stringify(todos));
+            render();
+        };
+
+        const add = () => {
+            if(!input.value.trim()) return;
+            todos.push({text:input.value.trim(),done:false});
+            input.value = "";
+            save();
+        };
+
+        widget.querySelector(".todo-add-btn").addEventListener("click",add);
+        input.addEventListener("keydown",e => { if(e.key === "Enter") add(); });
+        render();
+    }
+
+    if(type === "notes") {
+        const textarea = widget.querySelector(".note-input");
+        textarea.value = localStorage.getItem(STORAGE.notes) || "";
+        textarea.addEventListener("input",() => {
+            localStorage.setItem(STORAGE.notes,textarea.value);
+        });
+    }
+
+    if(type === "focus") {
+        const timer = widget.querySelector(".timer");
+        const startButton = widget.querySelector(".timer-start");
+        const resetButton = widget.querySelector(".timer-reset");
+
+        let state = JSON.parse(localStorage.getItem(STORAGE.timer) || "null") || {
+            remaining:1500,
+            endAt:null
+        };
+
+        let interval = null;
+
+        const getRemaining = () => {
+            if(state.endAt) return Math.max(0,Math.ceil((state.endAt - Date.now()) / 1000));
+            return state.remaining;
+        };
+
+        const saveTimer = () => {
+            localStorage.setItem(STORAGE.timer,JSON.stringify(state));
+        };
+
+        const render = () => {
+            const remaining = getRemaining();
+            timer.textContent = String(Math.floor(remaining / 60)).padStart(2,"0") + ":" +
+                String(remaining % 60).padStart(2,"0");
+        };
+
+        const stopTimer = () => {
+            if(interval) clearInterval(interval);
+            interval = null;
+        };
+
+        const tick = () => {
+            const remaining = getRemaining();
+            render();
+
+            if(remaining <= 0) {
+                stopTimer();
+                state = {remaining:1500,endAt:null};
+                saveTimer();
+                startButton.textContent = "Da-i blana";
+                render();
+                alert("Gata sesiunea! Ia o pauza, cumetre.");
+            }
+        };
+
+        const startTimer = () => {
+            if(state.endAt) {
+                state.remaining = getRemaining();
+                state.endAt = null;
+                startButton.textContent = "Continua";
+                saveTimer();
+                stopTimer();
+                render();
+                return;
+            }
+
+            state.endAt = Date.now() + state.remaining * 1000;
+            startButton.textContent = "Pauza";
+            saveTimer();
+            stopTimer();
+            interval = setInterval(tick,250);
+        };
+
+        startButton.addEventListener("click",startTimer);
+
+        resetButton.addEventListener("click",() => {
+            stopTimer();
+            state = {remaining:1500,endAt:null};
+            saveTimer();
+            startButton.textContent = "Da-i blana";
+            render();
+        });
+
+        if(state.endAt) {
+            startButton.textContent = "Pauza";
+            interval = setInterval(tick,250);
+            tick();
+        } else {
+            startButton.textContent = "Da-i blana";
+            render();
+        }
+    }
+}
+
+/* EDIT MODE */
+
+function setEditMode(enabled) {
+    editMode = enabled;
+    document.body.classList.toggle("editing",enabled);
+    $("editBtn").classList.toggle("active",enabled);
+    $("editBtn").textContent = enabled ? "Gata, salveaza :D" : "Mută widgeturi";
+}
+
+$("editBtn").addEventListener("click",() => {
+    setEditMode(!editMode);
+    if(!editMode) saveWidgets();
+});
+
+/* ADD MENU */
+
+function updateWidgetMenu() {
+    document.querySelectorAll("[data-add]").forEach(button => {
+        const exists = !!dashboard.querySelector(`[data-widget="${button.dataset.add}"]`);
+        button.disabled = exists;
+        button.textContent = exists ? "✓ " + widgetNames[button.dataset.add] :
+            button.dataset.add === "calculator" ? "🧮 Calculator" :
+            button.dataset.add === "todo" ? "✅ To-do list" :
+            button.dataset.add === "notes" ? "📝 Notes" : "⏱️ Focus timer";
+    });
+}
+
+$("addBtn").addEventListener("click",() => {
+    $("widgetMenu").classList.toggle("open");
+    $("settingsPanel").classList.remove("open");
+});
+
+document.querySelectorAll("[data-add]").forEach(button => {
+    button.addEventListener("click",() => {
+        createWidget(button.dataset.add);
+        $("widgetMenu").classList.remove("open");
+    });
+});
+
+/* REMOVE WIDGETS */
+
+dashboard.addEventListener("click",e => {
+    const button = e.target.closest(".remove-widget");
+    if(!button || !editMode) return;
+
+    const widget = button.closest(".widget");
+    if(widget) {
+        widget.remove();
+        saveWidgets();
+        updateWidgetMenu();
+    }
+});
+
+/* GLASS CUSTOMIZATION */
+
+function hexToRgb(hex) {
+    const value = hex.replace("#","");
+    return {
+        r:parseInt(value.slice(0,2),16),
+        g:parseInt(value.slice(2,4),16),
+        b:parseInt(value.slice(4,6),16)
+    };
+}
+
+function currentGlass() {
+    return {
+        color:$("tintPicker").value,
+        opacity:Number($("opacityRange").value)/100,
+        blur:Number($("blurRange").value)
+    };
+}
+
+function applyGlass(settings) {
+    const rgb = hexToRgb(settings.color);
+    document.documentElement.style.setProperty("--glass-rgb",`${rgb.r},${rgb.g},${rgb.b}`);
+    document.documentElement.style.setProperty("--glass-opacity",settings.opacity);
+    document.documentElement.style.setProperty("--glass-border",Math.min(.5,settings.opacity+.12));
+    document.documentElement.style.setProperty("--glass-blur",settings.blur+"px");
+
+    $("tintPicker").value = settings.color;
+    $("opacityRange").value = settings.opacity*100;
+    $("blurRange").value = settings.blur;
+}
+
+function saveGlass() {
+    const settings = currentGlass();
+    applyGlass(settings);
+    localStorage.setItem(STORAGE.glass,JSON.stringify(settings));
+}
+
+const defaultGlass = {color:"#ffffff",opacity:.10,blur:22};
+let savedGlass;
+
+try {
+    savedGlass = JSON.parse(localStorage.getItem(STORAGE.glass) || "null");
+} catch {
+    savedGlass = null;
+}
+applyGlass(savedGlass || defaultGlass);
+
+$("tintPicker").addEventListener("input",saveGlass);
+$("opacityRange").addEventListener("input",saveGlass);
+$("blurRange").addEventListener("input",saveGlass);
+
+document.querySelectorAll(".tint").forEach(button => {
+    button.addEventListener("click",() => {
+        $("tintPicker").value = button.dataset.color;
+        saveGlass();
+    });
+});
+
+$("settingsBtn").addEventListener("click",() => {
+    $("settingsPanel").classList.toggle("open");
+    $("widgetMenu").classList.remove("open");
+});
+
+$("closeSettings").addEventListener("click",() => {
+    $("settingsPanel").classList.remove("open");
+});
+
+$("resetGlass").addEventListener("click",() => {
+    applyGlass(defaultGlass);
+    localStorage.setItem(STORAGE.glass,JSON.stringify(defaultGlass));
+});
+
+/* START */
+
+dashboard.querySelectorAll(".widget").forEach(setupWidget);
+loadWidgets();
+updateWidgetMenu();
+</script>
+</body>
+</html>
